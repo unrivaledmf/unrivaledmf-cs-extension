@@ -1,4 +1,4 @@
-package com.example
+package com.fadil
 
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.lagradost.cloudstream3.*
