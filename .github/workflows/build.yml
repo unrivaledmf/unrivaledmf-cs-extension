@@ -1,7 +1,7 @@
 name: Build
 
 # https://docs.github.com/en/actions/learn-github-actions/workflow-syntax-for-github-actions#concurrency
-concurrency: 
+concurrency:
   group: "build"
   cancel-in-progress: true
 
@@ -28,7 +28,7 @@ jobs:
         with:
           ref: "builds"
           path: "builds"
-      
+
       - name: Clean old builds
         run: rm $GITHUB_WORKSPACE/builds/*.cs3 || true
 
@@ -47,12 +47,11 @@ jobs:
           ./gradlew make makePluginsJson
           cp **/build/*.cs3 $GITHUB_WORKSPACE/builds
           cp build/plugins.json $GITHUB_WORKSPACE/builds
-
       - name: Push builds
         run: |
           cd $GITHUB_WORKSPACE/builds
-          git config --local user.email "naverwebtoon.towerofgod@gmail.com"
-          git config --local user.name "unrivaledmf"
+          git config --local user.email "actions@github.com"
+          git config --local user.name "GitHub Actions"
           git add .
           git commit --amend -m "Build $GITHUB_SHA" || exit 0   # do not error if nothing to commit
           git push --force
