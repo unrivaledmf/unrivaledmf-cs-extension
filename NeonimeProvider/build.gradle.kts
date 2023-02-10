@@ -23,5 +23,5 @@ cloudstream {
         "OVA",
     )
 
-    iconUrl = "https://www.google.com/s2/favicons?domain=neonime.watch&sz=%size%"
+    iconUrl = "https://www.google.com/s2/favicons?domain=neonime.fun&sz=%size%"
 }
