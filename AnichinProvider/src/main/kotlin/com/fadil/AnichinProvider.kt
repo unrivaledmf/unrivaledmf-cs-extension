@@ -4,167 +4,145 @@ import com.fasterxml.jackson.annotation.JsonProperty
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.LoadResponse.Companion.addAniListId
 import com.lagradost.cloudstream3.LoadResponse.Companion.addMalId
-import com.lagradost.cloudstream3.LoadResponse.Companion.addTrailer
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.loadExtractor
 import org.jsoup.nodes.Element
-import java.net.URI
-import java.util.*
+import java.util.ArrayList
 
-class NeonimeProvider : MainAPI() {
-    override var mainUrl = "https://neonime.fun"
-    private var baseUrl = mainUrl
-    override var name = "Neonime"
-    override val hasQuickSearch = false
-    override val hasMainPage = true
+class AnichinProvider : MainAPI() {
+    override var mainUrl = "https://anichin.vip/"
+    override var name =  "Anichin"
+    override var hasMainPage = true
     override var lang = "id"
     override val hasDownloadSupport = true
 
     override val supportedTypes = setOf(
         TvType.Anime,
         TvType.AnimeMovie,
-        TvType.OVA
+        TvType.OVA,
     )
 
     companion object {
         fun getType(t: String): TvType {
-            return if (t.contains("OVA", true) || t.contains("Special", true)) TvType.OVA
-            else if (t.contains("Movie", true)) TvType.AnimeMovie
-            else TvType.Anime
+            return when {
+                t.contains("TV") -> TvType.Anime
+                t.contains("Movie") -> TvType.AnimeMovie
+                else -> TvType.OVA
+            }
         }
-
         fun getStatus(t: String): ShowStatus {
             return when (t) {
-                "Ended"  -> ShowStatus.Completed
-                "OnGoing" -> ShowStatus.Ongoing
+                "Completed" -> ShowStatus.Completed
                 "Ongoing" -> ShowStatus.Ongoing
-                "In Production" -> ShowStatus.Ongoing
-                "Returning Series" -> ShowStatus.Ongoing
                 else -> ShowStatus.Completed
             }
         }
     }
+// what i don't have again is getProperAnimeLink, getBaseUrl, and if else of override suspend fun load 
 
     override val mainPage = mainPageOf(
-        "$mainUrl/episode/page/" to "Episode Terbaru",
-        "$mainUrl/tvshows/page/" to "Anime Terbaru",
-        "$mainUrl/movies/page/" to "Movie",
+        "$mainUrl/ongoing/page/" to "Anime Ongoing",
+        "$mainUrl/completed/page/" to "Anime Completed",
+        "&status=&type=&order=update" to "New Episode",
+        "&status=&type=&order=latest" to "New Anime",
+        "&sub=&order=popular" to "Popular Anime",
     )
 
-    override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-        val req = app.get(request.data + page)
-        baseUrl = getBaseUrl(req.url)
-        val home = req.document.select("tbody tr,div.item").mapNotNull {
+    override suspend fun getMainPage(
+        page: Int,
+        request: MainPageRequest
+    ): HomePageResponse {
+        val document = app.get(request.data + page).document
+        val home = document.select("div.excstf > article > div").mapNotNull {
             it.toSearchResult()
         }
         return newHomePageResponse(request.name, home)
     }
 
-    private fun getProperAnimeLink(uri: String): String {
-        return when {
-            uri.contains("/episode") -> {
-                val title = uri.substringAfter("$baseUrl/episode/").let { tt ->
-                    val fixTitle = Regex("(.*)-\\d{1,2}x\\d+").find(tt)?.groupValues?.getOrNull(1).toString()
-                    when {
-                        !tt.contains("-season") && !tt.contains(Regex("-1x\\d+")) && !tt.contains("one-piece") -> "$fixTitle-season-${Regex("-(\\d{1,2})x\\d+").find(tt)?.groupValues?.getOrNull(1).toString()}"
-                        tt.contains("-special") -> fixTitle.replace(Regex("-x\\d+"), "")
-                        !fixTitle.contains("-subtitle-indonesia") -> "$fixTitle-subtitle-indonesia"
-                        else -> fixTitle
-                    }
-                }
-
-//                title = when {
-//                    title.contains("youkoso-jitsuryoku") && !title.contains("-season") -> title.replace("-e-", "-e-tv-")
-//                    else -> title
-//                }
-
-                "$baseUrl/tvshows/$title"
-            }
-            else -> uri
-        }
-    }
-
     private fun Element.toSearchResult(): AnimeSearchResponse? {
-        val title = this.selectFirst("td.bb a")?.ownText() ?: this.selectFirst("h2")?.text() ?: return null
-        val href = getProperAnimeLink(fixUrl(this.select("a").attr("href")))
-        val posterUrl = fixUrl(this.select("img").attr("data-src"))
-        val epNum = this.selectFirst("td.bb span")?.text()?.let { eps ->
-            Regex("Episode\\s?(\\d+)").find(eps)?.groupValues?.getOrNull(1)?.toIntOrNull()
-        }
-
+        val title = this.selectFirst(" div > a > div.tt")?.text()?.trim() ?: return null
+        val href = this.selectFirst("a")!!.attr("href")
+        val posterUrl = this.select("div.limit > img").attr("src").toString()
+        val epNum = this.selectFirst(" div.eggepisode")?.ownText()?.replace(Regex("[^0-9]"), "")?.trim()
+            ?.toIntOrNull()
         return newAnimeSearchResponse(title, href, TvType.Anime) {
             this.posterUrl = posterUrl
             addSub(epNum)
         }
-
     }
+    
 
     override suspend fun search(query: String): List<SearchResponse> {
-        val document = app.get("$baseUrl/?s=$query").document
-        return document.select("div.item.episode-home").mapNotNull {
-            val title = it.selectFirst("div.judul-anime > span")!!.text()
-            val poster = it.select("img").attr("data-src").toString().trim()
-            val episodes = it.selectFirst("div.fixyear > h2.text-center")!!
-                .text().replace(Regex("\\D"), "").trim().toIntOrNull()
-            val tvType = getType(it.selectFirst("span.calidad2.episode")?.text().toString())
-            val href = getProperAnimeLink(fixUrl(it.selectFirst("a")!!.attr("href")))
-
-            newAnimeSearchResponse(title, href, tvType) {
-                this.posterUrl = poster
-                addSub(episodes)
+        val link = "$mainUrl/?s$query&post_type=anime"
+        val document = app.get(
+            link
+        ).document
+        return document.select("div.listupd > article > div").map {
+            val title = it.selectFirst("a > div.tt")!!.ownText().trim()
+            val href = it.selectFirst("div > a")!!.attr("href")
+            val posterUrl = it.selectFirst("img")!!.attr("src").toString()
+            newAnimeSearchResponse(title, href, TvType.Anime){
+                this.posterUrl = posterUrl
             }
         }
     }
 
     override suspend fun load(url: String): LoadResponse {
-        val document = app.get(url).document
+        val document = app.get(
+            url
+        ).document
+        val title = document.selectFirst("div.infox > h1")?.ownText()
+            ?.replace(":",  "")?.trim().toString()
+        val poster = document.selectFirst("div.bigcontent.nobigcv img")?.attr("src")
+        val tags = document.select("div.infox > div > div.info-content > div.genxed > a").map { it.text()}
+        val type = document.selectFirst("div.infox > div > div.info-content > div.spe > span:nth-child(8)")?.ownText()
+            ?.replace( ":", "")?.trim() ?: "tv"
 
-        if (url.contains("movie") || url.contains("live-action")) {
-            val mTitle = document.selectFirst(".sbox > .data > h1[itemprop = name]")?.text().toString().replace("Subtitle Indonesia", "").trim()
-            val mPoster = document.selectFirst(".sbox > .imagen > .fix > img[itemprop = image]")?.attr("data-src")
-            val mTrailer = document.selectFirst("div.youtube_id iframe")?.attr("data-wpfc-original-src")?.substringAfterLast("html#")?.let{ "https://www.youtube.com/embed/$it"}
-            val year = document.selectFirst("a[href*=release-year]")!!.text().toIntOrNull()
-            val (malId, anilistId, image, cover) = getTracker(mTitle, "movie", year)
-            return newMovieLoadResponse(name = mTitle, url = url, type = TvType.Movie, dataUrl = url) {
-                posterUrl = image ?: mPoster
-                backgroundPosterUrl = cover ?: image ?: mPoster
-                this.year = year
-                plot = document.select("div[itemprop = description]").text().trim()
-                rating = document.select("span[itemprop = ratingValue]").text().toIntOrNull()
-                tags = document.select("p.meta_dd > a").map { it.text() }
-                addTrailer(mTrailer)
-                addMalId(malId)
-                addAniListId(anilistId?.toIntOrNull())
-            }
-        }
-        else {
-            val title = document.select("h1[itemprop = name]").text().replace("Subtitle Indonesia", "").trim()
-            val poster = document.selectFirst(".imagen > img")?.attr("data-src")
-            val trailer = document.selectFirst("div.youtube_id_tv iframe")?.attr("data-wpfc-original-src")?.substringAfterLast("html#")?.let{ "https://www.youtube.com/embed/$it"}
-            val year = document.select("#info a[href*=\"-year/\"]").text().toIntOrNull()
-            val (malId, anilistId, image, cover) = getTracker(title, "tv", year)
-            val episodes = document.select("ul.episodios > li").mapNotNull {
-                val link = fixUrl(it.selectFirst(".episodiotitle > a")!!.attr("href"))
-                val name = it.selectFirst(".episodiotitle > a")?.ownText().toString()
-                val episode = Regex("(\\d+[.,]?\\d*)").find(name)?.groupValues?.getOrNull(0)?.toIntOrNull()
-                Episode(link, name, episode = episode)
-            }.reversed()
+        val year = Regex("\\d, ([0-9]*)").find(
+            document.select("div.info-content > div.spe > span:nth-child(12) > time").text()
+        )?.groupValues?.get(1)?.toIntOrNull()
+        val status = getStatus(
+            document.selectFirst("div.infox > div > div.info-content > div.spe > span:nth-child(1)")!!.ownText()
+                .replace(":", "")
+                .trim()
+        )
+        val description = document.select("div.bixbox.synp > div.entry-content > p").text()
 
-            return newAnimeLoadResponse(title, url, TvType.Anime) {
-                engName = title
-                posterUrl = image ?: poster
-                backgroundPosterUrl = cover ?: image ?: poster
-                this.year = year
-                addEpisodes(DubStatus.Subbed, episodes)
-                showStatus = getStatus(document.select("div.metadatac > span").last()!!.text().trim())
-                plot = document.select("div[itemprop = description] > p").text().trim()
-                tags = document.select("#info a[href*=\"-genre/\"]").map { it.text() }
-                addTrailer(trailer)
-                addMalId(malId)
-                addAniListId(anilistId?.toIntOrNull())
+        val (malId, anilistId, image, cover) = getTracker(title, type, year)
+
+        val episodes = document.select("div.eplister")[1].select("ul > li").mapNotNull {
+            val name = it.selectFirst("a")?.text() ?: return@mapNotNull null
+            val episode = Regex( "Episode\\s?([0-9]+)").find(name)?.groupValues?.getOrNull(0)
+                ?: it.selectFirst("a")?.text()
+            val link = fixUrl(it.selectFirst("a")!!.attr("href"))
+            Episode(link, name, episode = episode?.toIntOrNull())
+        }.reversed()
+
+        val recommendations =
+            document.select("div > div.listupd > article > div > a").map {
+                val  recName = it.selectFirst("div > a > div.tt")!!.text()
+                val  recHref = it.selectFirst("a")!!.attr("href")
+                val recPosterUrl = it.selectFirst(" img ")?.attr("src").toString()
+                newAnimeSearchResponse(recName, recHref, TvType.Anime) {
+                    this.posterUrl = recPosterUrl
+                }
             }
+
+        return newAnimeLoadResponse(title, url, getType(type)) {
+            engName = title
+            posterUrl = image ?: poster
+            backgroundPosterUrl = cover ?: image ?: poster
+            this.year = year
+            addEpisodes(DubStatus.Subbed, episodes)
+            showStatus = status
+            plot = description
+            this.tags = tags
+            addMalId(malId)
+            addAniListId(anilistId?.toIntOrNull())
+            this.recommendations = recommendations
         }
     }
+
 
     override suspend fun loadLinks(
         data: String,
@@ -172,28 +150,19 @@ class NeonimeProvider : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        val source = if(data.contains("movie") || data.contains("live-action")) {
-            app.get(data).document.select("#player2-1 > div[id*=div]").mapNotNull {
-                fixUrl(it.select("iframe").attr("data-src"))
-            }
-        } else {
-            app.get(data).document.select(".player2 > .embed2 > div[id*=player]").mapNotNull {
-                fixUrl(it.select("iframe").attr("data-src"))
-            }
-        }
+        val document = app.get(data).document
+        val sources = document.select("div.video-content > div.lowvid  > div.player-embed").mapNotNull { 
+            fixUrl(it.select("iframe").attr("src"))
+         }
+         sources.apmap {
+            loadExtractor(it, data, subtitleCallback,callback)
+         }
 
-        source.apmap {
-            loadExtractor(it, data, subtitleCallback, callback)
-        }
-
-        return true
+         return true
     }
 
-    private fun getBaseUrl(url: String): String {
-        return URI(url).let {
-            "${it.scheme}://${it.host}"
-        }
-    }
+//=============================================================
+
 
     private suspend fun getTracker(title: String?, type: String?, year: Int?): Tracker {
         val res = app.get("https://api.consumet.org/meta/anilist/$title")
@@ -233,3 +202,5 @@ class NeonimeProvider : MainAPI() {
     )
 
 }
+
+
