@@ -1,0 +1,42 @@
+[
+    {
+        "iconUrl": "https://www.google.com/s2/favicons?domain=anichin.vip&sz=%size%",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/unrivaledmf/unrivaledmf-cs-extension",
+        "fileSize": 18175,
+        "status": 1,
+        "language": "id",
+        "authors": [
+            "fadil"
+        ],
+        "tvTypes": [
+            "AnimeMovie",
+            "Anime",
+            "OVA"
+        ],
+        "version": 7,
+        "internalName": "AnichinProvider",
+        "url": "https://raw.githubusercontent.com/unrivaledmf/unrivaledmf-cs-extension/builds/AnichinProvider.cs3",
+        "name": "AnichinProvider"
+    },
+    {
+        "iconUrl": "https://www.google.com/s2/favicons?domain=neonime.fun&sz=%size%",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/unrivaledmf/unrivaledmf-cs-extension",
+        "fileSize": 20371,
+        "status": 1,
+        "language": "id",
+        "authors": [
+            "fadil"
+        ],
+        "tvTypes": [
+            "AnimeMovie",
+            "Anime",
+            "OVA"
+        ],
+        "version": 7,
+        "internalName": "NeonimeProvider",
+        "url": "https://raw.githubusercontent.com/unrivaledmf/unrivaledmf-cs-extension/builds/NeonimeProvider.cs3",
+        "name": "NeonimeProvider"
+    }
+]

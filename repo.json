@@ -1,0 +1,8 @@
+{
+  "name": "Fadil CloudStream Extension",
+  "description": "Buatan Fadil",
+  "manifestVersion": 1,
+  "pluginLists": [
+    "https://raw.githubusercontent.com/unrivaledmf/unrivaledmf-cs-extension/builds/plugins.json"
+  ]
+}
